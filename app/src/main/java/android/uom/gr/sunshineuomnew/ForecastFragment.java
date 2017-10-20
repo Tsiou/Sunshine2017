@@ -8,6 +8,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
@@ -19,6 +20,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -29,6 +31,8 @@ import java.util.List;
  * create an instance of this fragment.
  */
 public class ForecastFragment extends Fragment {
+
+    ArrayAdapter<String> forecastListAdapter;
 
 
     private String[] data = {
@@ -56,13 +60,23 @@ public class ForecastFragment extends Fragment {
     }
 
     @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        if(id == R.id.action_refresh){
+            FetchWeatherTask task = new FetchWeatherTask();
+            task.execute();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+    @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
 
-        List<String> dummyList = Arrays.asList(data);
+        List<String> dummyList = new ArrayList<>(Arrays.asList(data));
 
-        ArrayAdapter<String> forecastListAdapter =
+         forecastListAdapter =
                 new ArrayAdapter<>(
                         getActivity(),                ////////  1
                         R.layout.list_item_forecast,
@@ -79,16 +93,25 @@ public class ForecastFragment extends Fragment {
         return rootView;
     }
 
-    public class FetchWeatherTask extends AsyncTask<String, Void, String[]> {
+
+    public class FetchWeatherTask   extends AsyncTask<String, Void, String[]> {
 
         @Override
         protected String[] doInBackground(String... params) {
-            fetchWeatherData();
-            return new String[0];
+            return fetchWeatherData();
         }
 
+        @Override
+        protected void onPostExecute(String[] strings) {
+            if(strings != null){
+                forecastListAdapter.clear();
+                for(String forecast : strings){
+                    forecastListAdapter.add(forecast);
+                }
+            }
+        }
 
-        private String fetchWeatherData() {
+        private String[] fetchWeatherData() {
 
             // These two need to be declared outside the try/catch
             // so that they can be closed in the finally block.
@@ -103,7 +126,10 @@ public class ForecastFragment extends Fragment {
                 // Possible parameters are avaiable at OWM's forecast API page, at
                 // http://openweathermap.org/API#forecast
                 //MODIFIED FOR CITY OF THESSALONIKI, GREECE
-                URL url = new URL("http://api.openweathermap.org/data/2.5/forecast/daily?id=734077&mode=json&units=metric&cnt=7");
+                URL url = new URL("http://api.openweathermap.org/data/2.5/" +
+                        "forecast/daily" +
+                        "?id=734077&mode=json&units=metric&cnt=7" +
+                        "&APPID=27949ea6b6dffa1dad1deb925c9b024b");
 
                 // Create the request to OpenWeatherMap, and open the connection
                 urlConnection = (HttpURLConnection) url.openConnection();
@@ -130,8 +156,17 @@ public class ForecastFragment extends Fragment {
                     // Stream was empty.  No point in parsing.
                 }
                 forecastJsonStr = buffer.toString();
+
+                Log.i("ForecastFragment",forecastJsonStr);
+
+                List<String> weatherList =
+                        WeatherJsonParser.getWeatherFromJson(forecastJsonStr, 7);
+
+                String[] wAr = new String[7];
+                return weatherList.toArray(wAr);
+
             } catch (IOException e) {
-                Log.e("PlaceholderFragment", "Error ", e);
+                Log.e("ForecastFragment", "Error ", e);
                 // If the code didn't successfully get the weather data, there's no point in attemping
                 // to parse it.
             } finally {
@@ -146,7 +181,7 @@ public class ForecastFragment extends Fragment {
                     }
                 }
             }
-            return forecastJsonStr;
+            return null;
         }
     }
 
